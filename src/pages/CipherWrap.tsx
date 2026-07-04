@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Contract, parseUnits } from "ethers";
+import { Contract, JsonRpcProvider, parseUnits } from "ethers";
 import { WalletButton } from "../components/WalletButton";
 import { ERC20_ABI, WRAPPER_ABI, type WrapperPair } from "../lib/contracts";
 import { WalletState, shortAddress } from "../lib/wallet";
@@ -27,8 +27,8 @@ export function CipherWrap() {
   }, [amount]);
 
   useEffect(() => {
-    if (!wallet) return;
-    readOnchainRegistry(wallet.provider)
+    const rpc = import.meta.env.VITE_SEPOLIA_RPC_URL || "https://ethereum-sepolia-rpc.publicnode.com";
+    readOnchainRegistry(new JsonRpcProvider(rpc))
       .then((onchain) => {
         const merged = mergeRegistryPairs(docsRegistryPairs(), onchain);
         setPairs(merged);
@@ -38,7 +38,7 @@ export function CipherWrap() {
         setStatus(`Loaded ${c.onchainBacked} pair(s) from the onchain registry, ${c.valid} valid.`);
       })
       .catch((err) => setStatus(err instanceof Error ? `Registry fallback active: ${err.message}` : "Registry fallback active."));
-  }, [wallet]);
+  }, []);
 
   function underlyingContract() {
     if (!wallet) throw new Error("Connect wallet first.");
@@ -145,7 +145,7 @@ export function CipherWrap() {
           <h2>{selected.symbol} actions</h2>
           <p className="muted">Underlying {shortAddress(selected.underlying)}. Wrapper {shortAddress(selected.wrapper)}.</p>
           <label>Amount<input value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
-          {wrapPlan && <p className="muted">Wrap plan: {formatRawAmount(wrapPlan.roundedRaw, 6)} public units become {wrapPlan.confidentialUnits.toString()} confidential units.</p>}
+          {wrapPlan && <p className="muted">Wrap plan: {formatRawAmount(wrapPlan.roundedRaw, 6)} public units become {wrapPlan.confidentialUnits.toString()} raw confidential units.</p>}
           <div className="button-row">
             <button className="button secondary" onClick={mintUnderlying} disabled={!wallet || !selected.mintable}>Mint mock</button>
             <button className="button primary" onClick={approveAndWrap} disabled={!wallet || !selected.isValid}>Approve and wrap</button>
