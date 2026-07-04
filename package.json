@@ -1,0 +1,30 @@
+{
+  "name": "cipherwrap",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --host 0.0.0.0"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "ethers": "^6.16.0",
+    "vite": "latest",
+    "typescript": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "lucide-react": "latest",
+    "@zama-fhe/relayer-sdk": "^0.4.1"
+  },
+  "devDependencies": {
+    "@types/react": "latest",
+    "@types/react-dom": "latest"
+  },
+  "description": "Confidential wrapper registry app for ERC-20 to ERC-7984 pairs on Zama Sepolia",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kamalbuilds/cipherwrap.git"
+  }
+}
