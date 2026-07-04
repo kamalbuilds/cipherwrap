@@ -30,6 +30,9 @@ export const WRAPPER_ABI = [
   "function balanceOf(address account) view returns (bytes32)",
   "function wrap(address to,uint256 amount)",
   "function unwrap(address from,address to,bytes32 encryptedAmount,bytes inputProof)",
+  "function finalizeUnwrap(bytes32 unwrapRequestId,uint64 unwrapAmountCleartext,bytes decryptionProof)",
+  "function rate() view returns (uint256)",
+  "function unwrapAmount(bytes32 unwrapRequestId) view returns (bytes32)",
   "function confidentialTransfer(address to,bytes32 encryptedAmount,bytes inputProof)",
   "function setOperator(address operator,uint48 until)",
 ] as const;
