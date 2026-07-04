@@ -1,19 +1,5 @@
 export const SEPOLIA_CHAIN_ID = 11155111n;
 
-export const VEILVOTE_ADDRESS = (import.meta.env.VITE_VEILVOTE_ADDRESS || "") as `0x${string}` | "";
-
-export const VEILVOTE_ABI = [
-  "function createProposal(string title,string metadataURI,string[] options,uint64 duration,bool allowlistOnly,address[] initialVoters) returns (uint256)",
-  "function addVoters(uint256 proposalId,address[] voters)",
-  "function castVote(uint256 proposalId,bytes32 encryptedChoice,bytes inputProof)",
-  "function finalize(uint256 proposalId)",
-  "function proposalCount() view returns (uint256)",
-  "function getProposal(uint256 proposalId) view returns (address creator,string title,string metadataURI,string[] options,uint64 startTime,uint64 endTime,bool allowlistOnly,bool finalized,uint256 ballotsCast)",
-  "function getEncryptedTallies(uint256 proposalId) view returns (bytes32[])",
-  "function hasVoted(uint256 proposalId,address voter) view returns (bool)",
-  "event ProposalCreated(uint256 indexed proposalId,address indexed creator,string title,uint256 optionCount,uint64 endTime,bool allowlistOnly)",
-] as const;
-
 export const ERC20_ABI = [
   "function name() view returns (string)",
   "function symbol() view returns (string)",
