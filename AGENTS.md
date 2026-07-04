@@ -1,0 +1,30 @@
+# Agent notes
+
+## Frontend QA rule (required)
+
+Always run frontend QA with the `bh-multi` browser harness using Brave Browser. Never use Google Chrome or the default Playwright Chromium for QA screenshots or click-through.
+
+Workflow:
+
+```bash
+bh-multi launch qa
+bh-multi run qa "
+new_tab('http://localhost:<port>')
+wait_for_load()
+cdp('Emulation.setDeviceMetricsOverride', width=1440, height=900, deviceScaleFactor=1, mobile=False)
+import time; time.sleep(1)
+capture_screenshot('/tmp/qa.png')
+print(page_info())
+"
+bh-multi stop qa
+```
+
+Launch, screenshot, and stop inside one shell session so the Brave process is not orphaned between calls.
+
+## Anti-slop frontend rules
+
+Follow `~/.config/agent-rules/anti-ai-slop-frontend.md`. No rainbow gradient text, no floating tag pills, no ghost corner numbers, no placeholder icon avatars, no em dashes in UI or markdown.
+
+## Verification before done
+
+Run tests and build before claiming completion. Do not defer verification to the user.
