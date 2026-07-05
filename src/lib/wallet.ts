@@ -31,7 +31,9 @@ async function ensureSepolia(walletProvider: NonNullable<ReturnType<typeof getWa
     await walletProvider.request({ method: "wallet_switchEthereumChain", params: [{ chainId: "0xaa36a7" }] });
   } catch (err) {
     const code = typeof err === "object" && err && "code" in err ? (err as { code?: number }).code : undefined;
-    if (code !== 4902) throw err;
+    const message = typeof err === "object" && err && "message" in err ? String((err as { message?: string }).message) : "";
+    const shouldAddChain = code === 4902 || code === -32603 || /unrecognized chain/i.test(message);
+    if (!shouldAddChain) throw err;
     await walletProvider.request({
       method: "wallet_addEthereumChain",
       params: [{
