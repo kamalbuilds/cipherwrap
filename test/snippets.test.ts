@@ -11,12 +11,22 @@ const pair: WrapperPair = {
 };
 
 describe("integration snippet generator", () => {
-  it("generates a registry-first wrap snippet for the selected official pair", () => {
+  it("generates a registry-first developer handoff for the selected official pair", () => {
     const snippet = generateIntegrationSnippet(pair);
     expect(snippet).toContain(WRAPPERS_REGISTRY);
     expect(snippet).toContain(pair.wrapper);
     expect(snippet).toContain(pair.underlying);
+    expect(snippet).toContain("assertcUSDCMockRegistryPair");
     expect(snippet).toContain("isConfidentialTokenValid");
-    expect(snippet).toContain("wrap");
+    expect(snippet).toContain("approveAndWrapcUSDCMock");
+    expect(snippet).toContain("readcUSDCMockBalanceHandle");
+    expect(snippet).toContain("requestcUSDCMockUnwrap");
+    expect(snippet).toContain("finalizecUSDCMockUnwrap");
+  });
+
+  it("sanitizes symbols before using them in exported function names", () => {
+    const snippet = generateIntegrationSnippet({ ...pair, symbol: "c-USD.Mock" });
+    expect(snippet).toContain("approveAndWrapcUSDMock");
+    expect(snippet).not.toContain("approveAndWrapc-USD.Mock");
   });
 });

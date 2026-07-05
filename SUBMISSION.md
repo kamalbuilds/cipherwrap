@@ -12,10 +12,10 @@ Show the official pairs list, mock faucet count, and registry source-of-truth mo
 Connect a wallet, select cUSDCMock, mint test tokens, approve the wrapper, and wrap into confidential ERC-7984 tokens.
 
 1:40 to 2:20
-Show balance decryption and arbitrary ERC-7984 balance lookup for non-registry tokens.
+Show verified user decryption, arbitrary ERC-7984 balance lookup for non-registry tokens, and the transaction history with Etherscan links.
 
 2:20 to 3:00
-Show `docs/ADDING_PAIRS.md` and explain how teams can add pairs without fragmenting the ecosystem.
+Show `docs/SUBMISSION.md`, the integration snippet panel, and `docs/ADDING_PAIRS.md` so teams can copy the registry-first integration path.
 
 ## X thread draft
 
