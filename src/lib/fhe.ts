@@ -40,15 +40,8 @@ export async function createFheInstance(networkInput?: unknown) {
   const relayer = (await import("@zama-fhe/relayer-sdk/web")) as unknown as Relayer;
   await relayer.initSDK();
 
-  const network = typeof networkInput === "string"
-    ? networkInput
-    : isEip1193Provider(networkInput)
-      ? networkInput
-      : getBrowserWalletProvider();
-
-  if (!network) {
-    throw new Error("No EIP-1193 wallet provider found for Zama relayer SDK.");
-  }
+  const fallbackRpc = "https://ethereum-sepolia-rpc.publicnode.com";
+  const network = typeof networkInput === "string" ? networkInput : fallbackRpc;
 
   return relayer.createInstance({ ...relayer.SepoliaConfig, network });
 }
