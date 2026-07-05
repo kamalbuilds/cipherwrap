@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useReducer, useState } from "react";
-import { Contract, JsonRpcProvider, isAddress, parseUnits } from "ethers";
+import { Contract, JsonRpcProvider, isAddress, parseUnits, type ContractRunner } from "ethers";
 import { WalletButton } from "../components/WalletButton";
 import { ERC20_ABI, WRAPPER_ABI, WRAPPERS_REGISTRY, type WrapperPair } from "../lib/contracts";
 import { WalletState, shortAddress } from "../lib/wallet";
@@ -47,28 +47,33 @@ export function CipherWrap() {
     }
   }, [amount]);
 
-  useEffect(() => {
+  async function loadRegistry(runner?: ContractRunner) {
+    setRegistryStatus("loading");
     const rpc = import.meta.env.VITE_SEPOLIA_RPC_URL || "https://ethereum-sepolia-rpc.publicnode.com";
-    readOnchainRegistry(new JsonRpcProvider(rpc))
-      .then((onchain) => {
-        const merged = mergeRegistryPairs(docsRegistryPairs(), onchain);
-        setPairs(merged);
-        const nextSelected = merged.find((pair) => pair.wrapper.toLowerCase() === selected.wrapper.toLowerCase()) ?? merged[0];
-        setSelected(nextSelected);
-        setRegistryStatus("live");
-        const c = registryCoverage(merged);
-        dispatchLifecycle({ type: "note", label: "Registry", message: `Loaded ${c.onchainBacked} pair(s) from the onchain registry, ${c.valid} valid.` });
-      })
-      .catch((err) => {
-        const message = messageFromError(err, "Registry read failed.");
-        setRegistryStatus({ kind: "fallback", error: message });
-        dispatchLifecycle({ type: "note", label: "Registry", message: `Registry fallback active: ${message}` });
-      });
+    try {
+      const onchain = await readOnchainRegistry(runner ?? new JsonRpcProvider(rpc));
+      const merged = mergeRegistryPairs(docsRegistryPairs(), onchain);
+      setPairs(merged);
+      const nextSelected = merged.find((pair) => pair.wrapper.toLowerCase() === selected.wrapper.toLowerCase()) ?? merged[0];
+      setSelected(nextSelected);
+      setRegistryStatus("live");
+      const c = registryCoverage(merged);
+      dispatchLifecycle({ type: "note", label: "Registry", message: `Loaded ${c.onchainBacked} pair(s) from the onchain registry, ${c.valid} valid.` });
+    } catch (err) {
+      const message = messageFromError(err, "Registry read failed.");
+      setRegistryStatus({ kind: "fallback", error: message });
+      dispatchLifecycle({ type: "note", label: "Registry", message: `Registry fallback active: ${message}` });
+    }
+  }
+
+  useEffect(() => {
+    void loadRegistry();
   }, []);
 
   function handleWalletConnect(nextWallet: WalletState) {
     setWallet(nextWallet);
     dispatchLifecycle({ type: "note", label: "Wallet", message: `Connected ${shortAddress(nextWallet.address)} on Sepolia.` });
+    void loadRegistry(nextWallet.provider);
   }
 
   function selectPair(pair: RegistryPair) {
