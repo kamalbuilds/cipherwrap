@@ -13,7 +13,7 @@ export const ERC20_ABI = [
 export const WRAPPER_ABI = [
   "function name() view returns (string)",
   "function symbol() view returns (string)",
-  "function balanceOf(address account) view returns (bytes32)",
+  "function confidentialBalanceOf(address account) view returns (bytes32)",
   "function wrap(address to,uint256 amount)",
   "function unwrap(address from,address to,bytes32 encryptedAmount,bytes inputProof)",
   "function finalizeUnwrap(bytes32 unwrapRequestId,uint64 unwrapAmountCleartext,bytes decryptionProof)",

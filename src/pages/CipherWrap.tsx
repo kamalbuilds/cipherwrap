@@ -100,7 +100,7 @@ export function CipherWrap() {
   async function decryptBalance(pair = selected) {
     if (!wallet) return;
     try {
-      const handle = await wrapperContract(pair).balanceOf(wallet.address);
+      const handle = await wrapperContract(pair).confidentialBalanceOf(wallet.address);
       setStatus("Requesting EIP-712 signature for user decryption.");
       const result = await userDecryptHandle(wallet.provider, {
         handle,
