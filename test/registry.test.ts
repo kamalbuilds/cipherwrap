@@ -19,6 +19,7 @@ describe("registry merge", () => {
   it("summarizes coverage", () => {
     const coverage = registryCoverage(docsRegistryPairs());
     expect(coverage.total).toBeGreaterThanOrEqual(8);
+    expect(coverage.valid).toBe(0);
     expect(coverage.mintable).toBeGreaterThanOrEqual(7);
   });
 });

@@ -17,6 +17,13 @@ Onchain validity wins. Docs metadata is display-only.
 
 `src/lib/registry.ts` reads `getTokenConfidentialTokenPairsLength` and `getTokenConfidentialTokenPair(index)`, then merges onchain rows with docs metadata.
 
+The same module now produces user-facing registry health and pair safety states:
+
+- `loading`: writes are locked while the app waits for Sepolia.
+- `live`: writes unlock only for onchain-confirmed valid pairs.
+- `fallback`: docs metadata stays visible, but mint, wrap, and unwrap actions remain locked.
+- revoked or invalid pairs: visible in the registry list, locked for writes, and labeled as revoked.
+
 ### Faucet
 
 For official mock underlyings, CipherWrap calls `mint(address,uint256)` on the ERC-20 mock token. Restricted pairs are rendered but faucet actions are disabled.
@@ -33,7 +40,12 @@ CipherWrap calls `balanceOf(address)` on the ERC-7984 token to get an encrypted 
 
 CipherWrap encrypts a uint64 amount for the wrapper contract, calls `unwrap(from,to,encryptedAmount,inputProof)`, and parses `UnwrapRequested` from the receipt. The finalization stage requires a public decryption proof for the request amount handle.
 
+The finalization helper keeps the request id and amount handle on screen, reads `unwrapAmount(requestId)`, attempts public decryption for the clear amount, accepts proof bytes, and calls `finalizeUnwrap(requestId, clearAmount, proof)`.
+
+### Integration snippets
+
+`src/lib/snippets.ts` generates a copyable Ethers example for the selected pair. The snippet checks `isConfidentialTokenValid(wrapper)` on the official registry before approval or wrapping.
+
 ## Threat model
 
 CipherWrap is a frontend for official contracts. It must not claim a pair is safe only because it appears in local metadata. Users should trust only registry validity and official wrapper contracts.
-

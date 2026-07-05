@@ -6,10 +6,13 @@ CipherWrap surfaces official ERC-20 to ERC-7984 wrapper pairs on Sepolia, helps 
 
 ## What judges can test
 
-- Browse every official Sepolia wrapper pair.
+- Browse every official Sepolia wrapper pair from the onchain registry.
+- See registry fallback, unconfirmed pair, and revoked pair states before any write.
 - Mint public mock tokens where Zama exposes a public faucet method.
 - Approve and wrap ERC-20 into ERC-7984 confidential tokens.
 - Check a confidential balance handle for any ERC-7984 token address.
+- Request an unwrap, parse the request id, read the clear amount, and stage `finalizeUnwrap` with a public decryption proof.
+- Generate a registry-first integration snippet for the selected pair.
 - Read the documented process for adding a new pair.
 
 ## Stack
@@ -23,5 +26,13 @@ CipherWrap surfaces official ERC-20 to ERC-7984 wrapper pairs on Sepolia, helps 
 
 ```bash
 npm install
+npm test
 npm run build
 ```
+
+## Production guardrails
+
+- Onchain registry validity is required before mint, wrap, or unwrap buttons unlock.
+- Docs metadata is display-only when the registry RPC fails.
+- Revoked or invalid registry pairs stay visible for auditability, but writes are disabled.
+- Integration snippets always call `isConfidentialTokenValid` before wrapping.

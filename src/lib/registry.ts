@@ -7,6 +7,24 @@ export type RegistryPair = WrapperPair & {
   index?: number;
 };
 
+export type RegistryStatus = "loading" | "live" | { kind: "fallback"; error?: string };
+
+export type PairSafety = {
+  badge: "Registry valid" | "Revoked" | "Unconfirmed" | "Registry pending";
+  canWrite: boolean;
+  canMint: boolean;
+  reason: string;
+  tone: "success" | "warn" | "danger";
+};
+
+export type RegistrySummary = {
+  title: string;
+  detail: string;
+  tone: "success" | "warn" | "danger";
+  onchainBacked: number;
+  invalidCount: number;
+};
+
 export type RawRegistryPair = {
   tokenAddress: string;
   confidentialTokenAddress: string;
@@ -74,8 +92,101 @@ export function shortSymbol(address: string) {
 export function registryCoverage(pairs: RegistryPair[]) {
   return {
     total: pairs.length,
-    valid: pairs.filter((pair) => pair.isValid).length,
+    valid: pairs.filter((pair) => isOnchainConfirmed(pair) && pair.isValid).length,
     mintable: pairs.filter((pair) => pair.mintable).length,
     onchainBacked: pairs.filter((pair) => pair.source === "merged" || pair.source === "onchain").length,
+  };
+}
+
+export function isOnchainConfirmed(pair: RegistryPair) {
+  return pair.source === "merged" || pair.source === "onchain";
+}
+
+function registryStatusKind(status: RegistryStatus) {
+  return typeof status === "string" ? status : status.kind;
+}
+
+export function getPairSafety(pair: RegistryPair, status: RegistryStatus): PairSafety {
+  if (registryStatusKind(status) === "loading") {
+    return {
+      badge: "Registry pending",
+      canWrite: false,
+      canMint: false,
+      reason: "Waiting for the onchain registry before enabling write actions.",
+      tone: "warn",
+    };
+  }
+
+  if (registryStatusKind(status) === "fallback" || !isOnchainConfirmed(pair)) {
+    return {
+      badge: "Unconfirmed",
+      canWrite: false,
+      canMint: false,
+      reason: "Onchain registry confirmation is required before mint, wrap, or unwrap actions.",
+      tone: "warn",
+    };
+  }
+
+  if (!pair.isValid) {
+    return {
+      badge: "Revoked",
+      canWrite: false,
+      canMint: false,
+      reason: "This pair is revoked or invalid in the onchain registry.",
+      tone: "danger",
+    };
+  }
+
+  return {
+    badge: "Registry valid",
+    canWrite: true,
+    canMint: pair.mintable,
+    reason: pair.mintable ? "Onchain registry confirms this wrapper pair." : "Onchain registry confirms this restricted wrapper pair.",
+    tone: "success",
+  };
+}
+
+export function summarizeRegistryState(pairs: RegistryPair[], status: RegistryStatus): RegistrySummary {
+  const coverage = registryCoverage(pairs);
+  const invalidCount = pairs.filter((pair) => isOnchainConfirmed(pair) && !pair.isValid).length;
+  const kind = registryStatusKind(status);
+
+  if (kind === "loading") {
+    return {
+      title: "Loading registry",
+      detail: "Checking Zama Sepolia before enabling write actions.",
+      tone: "warn",
+      onchainBacked: coverage.onchainBacked,
+      invalidCount,
+    };
+  }
+
+  if (kind === "fallback") {
+    const error = typeof status === "string" ? "" : status.error;
+    return {
+      title: "Registry fallback active",
+      detail: `Browsing docs metadata only. Write actions stay locked until the onchain registry responds${error ? `: ${error}` : "."}`,
+      tone: "warn",
+      onchainBacked: coverage.onchainBacked,
+      invalidCount,
+    };
+  }
+
+  if (coverage.onchainBacked === 0) {
+    return {
+      title: "Registry returned no pairs",
+      detail: "Docs metadata is visible for review, but write actions require an onchain-confirmed pair.",
+      tone: "warn",
+      onchainBacked: coverage.onchainBacked,
+      invalidCount,
+    };
+  }
+
+  return {
+    title: invalidCount ? "Registry live with invalid pairs" : "Registry live",
+    detail: `${coverage.onchainBacked} onchain-backed pair(s) loaded. ${invalidCount} revoked or invalid pair(s) are locked from writes.`,
+    tone: invalidCount ? "warn" : "success",
+    onchainBacked: coverage.onchainBacked,
+    invalidCount,
   };
 }
