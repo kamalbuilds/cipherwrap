@@ -10,7 +10,12 @@ export type UserDecryptRequest = {
 
 type FheUserDecryptInstance = Awaited<ReturnType<typeof createFheInstance>> & {
   generateKeypair: () => { privateKey: string; publicKey: string };
-  createEIP712: (publicKey: string, contractAddresses: string[], startTimestamp: number, durationDays: number) => { domain: never; types: never; message: never };
+  createEIP712: (
+    publicKey: string,
+    contractAddresses: string[],
+    startTimestamp: number,
+    durationDays: number,
+  ) => { domain: Record<string, unknown>; types: Record<string, Array<{ name: string; type: string }>>; message: Record<string, unknown> };
   userDecrypt: (
     handles: Array<{ handle: string; contractAddress: string }>,
     privateKey: string,
@@ -23,6 +28,11 @@ type FheUserDecryptInstance = Awaited<ReturnType<typeof createFheInstance>> & {
   ) => Promise<Record<string, bigint | string | number>>;
 };
 
+export function signingTypesWithoutDomain(types: Record<string, Array<{ name: string; type: string }>>) {
+  const { EIP712Domain: _eip712Domain, ...signingTypes } = types;
+  return signingTypes;
+}
+
 export async function userDecryptHandle(provider: BrowserProvider, request: UserDecryptRequest) {
   const signer = await provider.getSigner();
   const fhe = (await createFheInstance(provider)) as FheUserDecryptInstance;
@@ -31,7 +41,9 @@ export async function userDecryptHandle(provider: BrowserProvider, request: User
   const durationDays = request.durationDays ?? 1;
   const contractAddresses = [request.contractAddress];
   const typedData = fhe.createEIP712(keypair.publicKey, contractAddresses, startTimestamp, durationDays);
-  const signature = await signer.signTypedData(typedData.domain, typedData.types, typedData.message);
+  // ethers v6 derives EIP712Domain from `domain` and requires a single primary type,
+  // so the Zama-provided EIP712Domain entry must be removed before signing.
+  const signature = await signer.signTypedData(typedData.domain, signingTypesWithoutDomain(typedData.types), typedData.message);
   return fhe.userDecrypt(
     [{ handle: request.handle, contractAddress: request.contractAddress }],
     keypair.privateKey,
