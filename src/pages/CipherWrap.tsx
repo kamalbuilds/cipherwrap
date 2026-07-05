@@ -11,6 +11,19 @@ import { buildFinalizeUnwrapArgs, findUnwrapRequest, getPublicDecryptClearAmount
 import { generateIntegrationSnippet } from "../lib/snippets";
 import { LIFECYCLE_STEPS, initialLifecycleState, lifecycleReducer, summarizeLifecycle, type LifecycleStepKey } from "../lib/lifecycle";
 
+type AppRoute = "overview" | "workbench" | "developers";
+
+const ROUTES: Array<{ key: AppRoute; label: string; href: string }> = [
+  { key: "overview", label: "Overview", href: "#overview" },
+  { key: "workbench", label: "Wrap Workbench", href: "#workbench" },
+  { key: "developers", label: "Developer Docs", href: "#developers" },
+];
+
+function routeFromHash(): AppRoute {
+  const raw = window.location.hash.replace("#", "");
+  return ROUTES.some((route) => route.key === raw) ? (raw as AppRoute) : "overview";
+}
+
 function messageFromError(err: unknown, fallback: string) {
   return err instanceof Error ? err.message : fallback;
 }
@@ -24,6 +37,7 @@ function statusLabel(status: string) {
 }
 
 export function CipherWrap() {
+  const [route, setRoute] = useState<AppRoute>(routeFromHash);
   const [wallet, setWallet] = useState<WalletState | null>(null);
   const [pairs, setPairs] = useState<RegistryPair[]>(docsRegistryPairs());
   const [selected, setSelected] = useState<RegistryPair>(docsRegistryPairs()[0]);
@@ -46,6 +60,19 @@ export function CipherWrap() {
       return null;
     }
   }, [amount]);
+
+  useEffect(() => {
+    function syncRoute() {
+      setRoute(routeFromHash());
+    }
+
+    if (!window.location.hash) {
+      window.history.replaceState(null, "", "#overview");
+    }
+    window.addEventListener("hashchange", syncRoute);
+    syncRoute();
+    return () => window.removeEventListener("hashchange", syncRoute);
+  }, []);
 
   async function loadRegistry(runner?: ContractRunner) {
     setRegistryStatus("loading");
@@ -253,165 +280,294 @@ export function CipherWrap() {
     }
   }
 
-  return (
-    <section className="page-section stack">
-      <div className="split-hero">
-        <div>
-          <p className="label">Bounty Track</p>
-          <h1><span>Official wrappers.</span><span>One clean path.</span></h1>
-          <p className="lede">CipherWrap turns the Zama wrapper registry into a production-style workbench: live registry scan, faucet, approvals, wrapping, user decryption, unwrap requests, and developer handoff code.</p>
-        </div>
-        <div className="hero-side">
-          <WalletButton onConnect={handleWalletConnect} />
-          <div className="metrics hero-metrics">
-            <div><span className="stat-number">{coverage.total}</span><span>pairs</span></div>
-            <div><span className="stat-number">{coverage.valid}</span><span>valid</span></div>
-            <div><span className="stat-number">{coverage.onchainBacked}</span><span>onchain</span></div>
-          </div>
-        </div>
+  const registryAlert = (
+    <div className={`registry-alert ${registrySummary.tone}`}>
+      <div>
+        <strong>{registrySummary.title}</strong>
+        <p>{registrySummary.detail}</p>
       </div>
+      <span className="registry-count">{registrySummary.invalidCount} invalid</span>
+    </div>
+  );
 
-      <div className={`registry-alert ${registrySummary.tone}`}>
+  const registryPanel = (
+    <div className="glass-card registry-panel">
+      <div className="card-title-row">
         <div>
-          <strong>{registrySummary.title}</strong>
-          <p>{registrySummary.detail}</p>
-        </div>
-        <span className="registry-count">{registrySummary.invalidCount} invalid</span>
-      </div>
-
-      <div className="workbench two-col">
-        <div className="glass-card">
           <h2>Registry pairs</h2>
-          <div className="pair-list">
-            {pairs.map((pair) => {
-              const safety = getPairSafety(pair, registryStatus);
-              const className = ["pair-row", pair.wrapper === selected.wrapper ? "selected" : "", safety.tone === "danger" ? "invalid" : ""].filter(Boolean).join(" ");
-              return (
-                <button key={pair.wrapper} className={className} onClick={() => selectPair(pair)}>
-                  <span><strong>{pair.symbol}</strong><small>{pair.name} · {pair.source} · {safety.badge}</small></span>
-                  <code>{shortAddress(pair.wrapper)}</code>
-                </button>
-              );
-            })}
-          </div>
+          <p className="muted compact">Live registry entries merge with documented Sepolia metadata.</p>
         </div>
+        <span className="panel-stat"><strong>{coverage.valid}</strong><span>of {coverage.total} valid</span></span>
+      </div>
+      <div className="pair-list">
+        {pairs.map((pair) => {
+          const safety = getPairSafety(pair, registryStatus);
+          const className = ["pair-row", pair.wrapper === selected.wrapper ? "selected" : "", safety.tone === "danger" ? "invalid" : ""].filter(Boolean).join(" ");
+          return (
+            <button key={pair.wrapper} className={className} onClick={() => selectPair(pair)}>
+              <span><strong>{pair.symbol}</strong><small>{pair.name} · {pair.source} · {safety.badge}</small></span>
+              <code>{shortAddress(pair.wrapper)}</code>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 
-        <div className="glass-card action-card">
-          <div className="card-title-row">
-            <div>
-              <h2>{selected.symbol} lifecycle</h2>
-              <p className="muted compact">Underlying {shortAddress(selected.underlying)}. Wrapper {shortAddress(selected.wrapper)}.</p>
+  const lifecyclePanel = (
+    <div className="glass-card action-card">
+      <div className="card-title-row">
+        <div>
+          <h2>{selected.symbol} lifecycle</h2>
+          <p className="muted compact">Underlying {shortAddress(selected.underlying)}. Wrapper {shortAddress(selected.wrapper)}.</p>
+        </div>
+        <span className="registry-count">{lifecycleSummary.completed}/{lifecycleSummary.total} done</span>
+      </div>
+      <div className={`pair-state ${selectedSafety.tone}`}>
+        <strong>{selectedSafety.badge}</strong>
+        <span>{selectedSafety.reason}</span>
+      </div>
+      <label>Amount<input value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
+      {wrapPlan && <p className="muted compact">Wrap plan: {formatRawAmount(wrapPlan.roundedRaw, 6)} public units become {wrapPlan.confidentialUnits.toString()} raw confidential units.</p>}
+      <div className="button-row action-row">
+        <button className="button secondary" onClick={mintUnderlying} disabled={!wallet || !selectedSafety.canMint}>Mint mock</button>
+        <button className="button secondary" onClick={approveUnderlying} disabled={!wallet || !selectedSafety.canWrite}>Approve spend</button>
+        <button className="button primary" onClick={wrapApproved} disabled={!wallet || !selectedSafety.canWrite}>Wrap approved</button>
+        <button className="button secondary" onClick={() => decryptBalance()} disabled={!wallet}>User-decrypt balance</button>
+        <button className="button secondary" onClick={prepareUnwrap} disabled={!wallet || !selectedSafety.canWrite}>Request unwrap</button>
+      </div>
+      <p className="status-line">{lifecycle.banner}</p>
+      <div className="lifecycle-grid">
+        {LIFECYCLE_STEPS.map((step) => {
+          const state = lifecycle.steps[step.key];
+          return (
+            <div key={step.key} className={stepClass(state.status)}>
+              <span className="step-label">{step.label}</span>
+              <span className="step-status">{statusLabel(state.status)}</span>
+              <p>{state.message}</p>
+              {state.txHash && <a className="tx-link" href={`https://sepolia.etherscan.io/tx/${state.txHash}`} target="_blank" rel="noreferrer">Etherscan</a>}
             </div>
-            <span className="registry-count">{lifecycleSummary.completed}/{lifecycleSummary.total} steps done</span>
-          </div>
-          <div className={`pair-state ${selectedSafety.tone}`}>
-            <strong>{selectedSafety.badge}</strong>
-            <span>{selectedSafety.reason}</span>
-          </div>
-          <label>Amount<input value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
-          {wrapPlan && <p className="muted compact">Wrap plan: {formatRawAmount(wrapPlan.roundedRaw, 6)} public units become {wrapPlan.confidentialUnits.toString()} raw confidential units.</p>}
-          <div className="button-row action-row">
-            <button className="button secondary" onClick={mintUnderlying} disabled={!wallet || !selectedSafety.canMint}>Mint mock</button>
-            <button className="button secondary" onClick={approveUnderlying} disabled={!wallet || !selectedSafety.canWrite}>Approve spend</button>
-            <button className="button primary" onClick={wrapApproved} disabled={!wallet || !selectedSafety.canWrite}>Wrap approved</button>
-            <button className="button secondary" onClick={() => decryptBalance()} disabled={!wallet}>User-decrypt balance</button>
-            <button className="button secondary" onClick={prepareUnwrap} disabled={!wallet || !selectedSafety.canWrite}>Request unwrap</button>
-          </div>
-          <p className="status-line">{lifecycle.banner}</p>
-          <div className="lifecycle-grid">
-            {LIFECYCLE_STEPS.map((step) => {
-              const state = lifecycle.steps[step.key];
-              return (
-                <div key={step.key} className={stepClass(state.status)}>
-                  <span className="step-label">{step.label}</span>
-                  <span className="step-status">{statusLabel(state.status)}</span>
-                  {state.txHash && <a href={`https://sepolia.etherscan.io/tx/${state.txHash}`} target="_blank" rel="noreferrer">Etherscan</a>}
-                </div>
-              );
-            })}
-          </div>
-          {unwrapRequest && <p className="notice">Unwrap request {shortAddress(unwrapRequest.unwrapRequestId)}. Amount handle {shortAddress(unwrapRequest.amountHandle)}.</p>}
-          <div className="helper-panel">
-            <h3>Unwrap finalization helper</h3>
-            <p className="muted">Finalization needs a public decrypt clear amount and proof. The helper keeps the request id from the latest unwrap receipt so you only paste the proof bytes.</p>
-            {unwrapRequest ? (
-              <>
-                <div className="button-row">
-                  <button className="button secondary" onClick={readUnwrapClearAmount} disabled={!wallet}>Read clear amount</button>
-                </div>
-                <label>Clear amount<input value={clearUnwrapAmount} onChange={(e) => setClearUnwrapAmount(e.target.value)} placeholder="Public decrypt amount" /></label>
-                <label>Public decryption proof<input value={decryptionProof} onChange={(e) => setDecryptionProof(e.target.value)} placeholder="0x proof bytes" /></label>
-                <button className="button primary" onClick={finalizeUnwrap} disabled={!wallet || !clearUnwrapAmount || !decryptionProof}>Finalize unwrap</button>
-              </>
-            ) : (
-              <p className="muted">Request an unwrap to stage the request id and amount handle here.</p>
-            )}
-          </div>
-        </div>
+          );
+        })}
       </div>
+      {unwrapRequest && <p className="notice">Unwrap request {shortAddress(unwrapRequest.unwrapRequestId)}. Amount handle {shortAddress(unwrapRequest.amountHandle)}.</p>}
+      <div className="helper-panel">
+        <h3>Unwrap finalization helper</h3>
+        <p className="muted">Finalization needs a public decrypt clear amount and proof. The helper keeps the request id from the latest unwrap receipt so you only paste the proof bytes.</p>
+        {unwrapRequest ? (
+          <>
+            <div className="button-row">
+              <button className="button secondary" onClick={readUnwrapClearAmount} disabled={!wallet}>Read clear amount</button>
+            </div>
+            <label>Clear amount<input value={clearUnwrapAmount} onChange={(e) => setClearUnwrapAmount(e.target.value)} placeholder="Public decrypt amount" /></label>
+            <label>Public decryption proof<input value={decryptionProof} onChange={(e) => setDecryptionProof(e.target.value)} placeholder="0x proof bytes" /></label>
+            <button className="button primary" onClick={finalizeUnwrap} disabled={!wallet || !clearUnwrapAmount || !decryptionProof}>Finalize unwrap</button>
+          </>
+        ) : (
+          <p className="muted">Request an unwrap to stage the request id and amount handle here.</p>
+        )}
+      </div>
+    </div>
+  );
 
-      <div className="workbench two-col">
-        <div className="glass-card">
-          <div className="card-title-row">
-            <h2>Transaction and proof history</h2>
-            <span className="registry-count">latest 12</span>
+  const historyPanel = (
+    <div className="glass-card">
+      <div className="card-title-row">
+        <h2>Transaction and proof history</h2>
+        <span className="registry-count">latest 12</span>
+      </div>
+      <div className="history-list">
+        {lifecycle.history.length ? lifecycle.history.map((entry) => (
+          <div key={entry.id} className={`history-row ${entry.status}`}>
+            <div>
+              <strong>{entry.label}</strong>
+              <p>{entry.message}</p>
+            </div>
+            <div className="history-meta">
+              <span>{entry.status}</span>
+              {entry.href && <a className="tx-link" href={entry.href} target="_blank" rel="noreferrer">Etherscan</a>}
+            </div>
           </div>
-          <div className="history-list">
-            {lifecycle.history.length ? lifecycle.history.map((entry) => (
-              <div key={entry.id} className={`history-row ${entry.status}`}>
-                <div>
-                  <strong>{entry.label}</strong>
-                  <p>{entry.message}</p>
-                </div>
-                <div className="history-meta">
-                  <span>{entry.status}</span>
-                  {entry.href && <a href={entry.href} target="_blank" rel="noreferrer">Etherscan</a>}
-                </div>
+        )) : (
+          <p className="muted">Your first wallet confirmation, registry check, or user-decrypt proof will appear here with a durable status.</p>
+        )}
+      </div>
+    </div>
+  );
+
+  const customDecryptPanel = (
+    <div className="glass-card">
+      <h2>Arbitrary ERC-7984 balance check</h2>
+      <p className="muted">Paste any ERC-7984 address. The app requests an EIP-712 user-decryption signature before asking the relayer to decrypt your balance handle.</p>
+      <div className="inline-form"><input value={customToken} onChange={(e) => setCustomToken(e.target.value)} placeholder="0x ERC-7984 token" /><button className="button secondary" disabled={!wallet || !isAddress(customToken)} onClick={() => decryptBalance({ ...selected, wrapper: customToken as `0x${string}` })}>Check token</button></div>
+      <div className="developer-facts">
+        <span>Registry <code>{shortAddress(WRAPPERS_REGISTRY)}</code></span>
+        <span>Selected wrapper <code>{shortAddress(selected.wrapper)}</code></span>
+        <span>Selected public token <code>{shortAddress(selected.underlying)}</code></span>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="app-shell">
+      <header className="topbar">
+        <a className="brand" href="#overview" aria-label="CipherWrap overview"><span className="brand-mark">CW</span><span>CipherWrap</span></a>
+        <nav className="nav" aria-label="Primary">
+          {ROUTES.map((item) => (
+            <a key={item.key} className={`nav-link ${route === item.key ? "active" : ""}`} href={item.href}>{item.label}</a>
+          ))}
+        </nav>
+        <WalletButton onConnect={handleWalletConnect} />
+      </header>
+
+      {route === "overview" && (
+        <main className="page-section stack route-overview">
+          <section className="split-hero">
+            <div>
+              <h1><span>Confidential wrappers,</span><span>operated with proof.</span></h1>
+              <p className="lede">CipherWrap is a polished console for ERC-20 to ERC-7984 pairs on Zama Sepolia. It turns registry reads, mint approvals, wrapping, user decryption, unwrap requests, and finalization into one auditable workflow.</p>
+              <div className="button-row hero-actions">
+                <a className="button primary" href="#workbench">Open workbench</a>
+                <a className="button secondary" href="#developers">Read developer flow</a>
               </div>
-            )) : (
-              <p className="muted">Your first wallet confirmation, registry check, or user-decrypt proof will appear here with a durable status.</p>
-            )}
-          </div>
-        </div>
+            </div>
+            <aside className="hero-console glass-card">
+              <div className="console-line"><span>Registry</span><strong>{typeof registryStatus === "string" ? registryStatus : "fallback"}</strong></div>
+              <div className="console-line"><span>Selected pair</span><strong>{selected.symbol}</strong></div>
+              <div className="console-line"><span>Wallet</span><strong>{wallet ? shortAddress(wallet.address) : "not connected"}</strong></div>
+              <div className="mini-progress"><span style={{ width: `${Math.max(8, Math.round((lifecycleSummary.completed / lifecycleSummary.total) * 100))}%` }} /></div>
+              <p className="muted compact">A single control surface for operators who need privacy mechanics without guessing which contract is safe to call.</p>
+            </aside>
+          </section>
 
-        <div className="glass-card">
-          <h2>Arbitrary ERC-7984 balance check</h2>
-          <p className="muted">Paste any ERC-7984 address. The app requests an EIP-712 user-decryption signature before asking the relayer to decrypt your balance handle.</p>
-          <div className="inline-form"><input value={customToken} onChange={(e) => setCustomToken(e.target.value)} placeholder="0x ERC-7984 token" /><button className="button secondary" disabled={!wallet || !isAddress(customToken)} onClick={() => decryptBalance({ ...selected, wrapper: customToken as `0x${string}` })}>Check token</button></div>
-          <div className="developer-facts">
-            <span>Registry <code>{shortAddress(WRAPPERS_REGISTRY)}</code></span>
-            <span>Selected wrapper <code>{shortAddress(selected.wrapper)}</code></span>
-            <span>Selected public token <code>{shortAddress(selected.underlying)}</code></span>
-          </div>
-        </div>
-      </div>
+          {registryAlert}
 
-      <div className="glass-card developer-panel">
-        <div className="card-title-row">
-          <div>
-            <h2>Integration snippet</h2>
-            <p className="muted compact">Registry validation, approval, wrapping, balance-handle reads, unwrap requests, and finalize helpers for the selected pair.</p>
-          </div>
-          <button className="button secondary" onClick={copySnippet}>Copy snippet</button>
-        </div>
-        <div className="snippet-layout">
-          <div className="snippet-notes">
-            <h3>Developer checklist</h3>
-            <ol className="steps">
-              <li>Check `isConfidentialTokenValid` before every write.</li>
-              <li>Approve the public ERC-20, then call `wrap` with the same raw amount.</li>
-              <li>Read `confidentialBalanceOf` and run user decryption in the client.</li>
-              <li>Keep unwrap finalization gated on a public decrypt proof.</li>
-            </ol>
-          </div>
-          <textarea className="code-box" readOnly value={integrationSnippet} />
-        </div>
-      </div>
+          <section className="metrics hero-metrics" aria-label="Registry metrics">
+            <div><span className="stat-number">{coverage.total}</span><span>registered pairs</span></div>
+            <div><span className="stat-number">{coverage.valid}</span><span>write-ready pairs</span></div>
+            <div><span className="stat-number">{coverage.onchainBacked}</span><span>onchain backed</span></div>
+          </section>
 
-      <div className="glass-card">
-        <h2>Add-pair process</h2>
-        <ol className="steps"><li>Deploy or choose an ERC-20 token.</li><li>Deploy an ERC-7984 wrapper with valid interface support.</li><li>Ask registry governance to register the pair.</li><li>Use local metadata only as preview. Onchain registry validity wins.</li></ol>
-      </div>
-    </section>
+          <section className="feature-grid three">
+            <article className="mode-card clickable">
+              <h2>Registry-first safety</h2>
+              <p>Each write action checks the selected pair against registry validity, local metadata, and mintability before the wallet prompt appears.</p>
+            </article>
+            <article className="mode-card clickable">
+              <h2>Operator workbench</h2>
+              <p>Mint mock tokens, approve spend, wrap into confidential units, user-decrypt the private balance, and stage unwrap finalization from one page.</p>
+            </article>
+            <article className="mode-card clickable">
+              <h2>Developer handoff</h2>
+              <p>The docs page keeps a live snippet synced to the selected wrapper so integrators can copy the exact contract addresses and call sequence.</p>
+            </article>
+          </section>
+
+          <section className="glass-card command-center">
+            <div className="card-title-row">
+              <div>
+                <h2>Current operating lane</h2>
+                <p className="muted compact">The overview mirrors the selected workbench state without duplicating transaction controls.</p>
+              </div>
+              <a className="button secondary" href="#workbench">Continue in workbench</a>
+            </div>
+            <div className="audit-grid">
+              <div><span className="small-label">Pair</span><strong>{selected.symbol}</strong><code>{shortAddress(selected.wrapper)}</code></div>
+              <div><span className="small-label">Status</span><strong>{selectedSafety.badge}</strong><span>{selectedSafety.reason}</span></div>
+              <div><span className="small-label">Last event</span><strong>{lifecycle.history[0]?.label ?? "Ready"}</strong><span>{lifecycle.history[0]?.message ?? "Connect a wallet or load the registry to begin."}</span></div>
+            </div>
+          </section>
+        </main>
+      )}
+
+      {route === "workbench" && (
+        <main className="page-section stack route-workbench">
+          <section className="page-heading">
+            <div>
+              <h1><span>Wrap Workbench</span></h1>
+              <p className="lede">A transaction console for the full wrapper lifecycle. Select a registry pair, choose an amount, then walk through mint, approve, wrap, decrypt, unwrap, and finalize.</p>
+            </div>
+          </section>
+          {registryAlert}
+          <section className="workbench two-col">
+            {registryPanel}
+            {lifecyclePanel}
+          </section>
+          <section className="workbench two-col">
+            {historyPanel}
+            {customDecryptPanel}
+          </section>
+        </main>
+      )}
+
+      {route === "developers" && (
+        <main className="page-section stack route-developers">
+          <section className="page-heading split-heading">
+            <div>
+              <h1><span>Developer Docs</span></h1>
+              <p className="lede">Everything a consuming app needs to validate the registry, call the selected wrapper, and keep decrypt or unwrap flows behind explicit proofs.</p>
+            </div>
+            <div className="doc-summary glass-card">
+              <span className="small-label">Selected integration</span>
+              <strong>{selected.symbol}</strong>
+              <code>{shortAddress(selected.wrapper)}</code>
+            </div>
+          </section>
+
+          <section className="glass-card developer-panel">
+            <div className="card-title-row">
+              <div>
+                <h2>Integration snippet</h2>
+                <p className="muted compact">Registry validation, approval, wrapping, balance-handle reads, unwrap requests, and finalize helpers for the selected pair.</p>
+              </div>
+              <button className="button secondary" onClick={copySnippet}>Copy snippet</button>
+            </div>
+            <div className="snippet-layout">
+              <div className="snippet-notes">
+                <h3>Developer checklist</h3>
+                <ol className="steps">
+                  <li>Check <code>isConfidentialTokenValid</code> before every write.</li>
+                  <li>Approve the public ERC-20, then call <code>wrap</code> with the same raw amount.</li>
+                  <li>Read <code>confidentialBalanceOf</code> and run user decryption in the client.</li>
+                  <li>Keep unwrap finalization gated on a public decrypt proof.</li>
+                </ol>
+              </div>
+              <textarea className="code-box" readOnly value={integrationSnippet} />
+            </div>
+          </section>
+
+          <section className="workbench two-col">
+            <div className="glass-card">
+              <h2>Contract map</h2>
+              <div className="contract-list">
+                <div><span>Wrappers registry</span><code>{WRAPPERS_REGISTRY}</code></div>
+                <div><span>Selected wrapper</span><code>{selected.wrapper}</code></div>
+                <div><span>Selected public token</span><code>{selected.underlying}</code></div>
+              </div>
+            </div>
+            <div className="glass-card">
+              <h2>Add-pair process</h2>
+              <ol className="steps">
+                <li>Deploy or choose an ERC-20 token.</li>
+                <li>Deploy an ERC-7984 wrapper with valid interface support.</li>
+                <li>Ask registry governance to register the pair.</li>
+                <li>Use local metadata only as preview. Onchain registry validity wins.</li>
+              </ol>
+            </div>
+          </section>
+
+          <section className="glass-card">
+            <div className="card-title-row">
+              <div>
+                <h2>Docs-linked registry browser</h2>
+                <p className="muted compact">Pick a pair here and the snippet updates immediately.</p>
+              </div>
+              <a className="button secondary" href="#workbench">Open transaction console</a>
+            </div>
+            {registryPanel}
+          </section>
+        </main>
+      )}
+    </div>
   );
 }
