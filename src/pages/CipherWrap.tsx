@@ -256,13 +256,14 @@ export function CipherWrap() {
           <h1><span>Official wrappers.</span><span>One clean path.</span></h1>
           <p className="lede">CipherWrap turns the Zama wrapper registry into a production-style workbench: live registry scan, faucet, approvals, wrapping, user decryption, unwrap requests, and developer handoff code.</p>
         </div>
-        <WalletButton onConnect={handleWalletConnect} />
-      </div>
-
-      <div className="metrics">
-        <div><span className="stat-number">{coverage.total}</span><span>pairs tracked</span></div>
-        <div><span className="stat-number">{coverage.valid}</span><span>valid wrappers</span></div>
-        <div><span className="stat-number">{coverage.onchainBacked}</span><span>onchain backed</span></div>
+        <div className="hero-side">
+          <WalletButton onConnect={handleWalletConnect} />
+          <div className="metrics hero-metrics">
+            <div><span className="stat-number">{coverage.total}</span><span>pairs</span></div>
+            <div><span className="stat-number">{coverage.valid}</span><span>valid</span></div>
+            <div><span className="stat-number">{coverage.onchainBacked}</span><span>onchain</span></div>
+          </div>
+        </div>
       </div>
 
       <div className={`registry-alert ${registrySummary.tone}`}>
@@ -296,7 +297,7 @@ export function CipherWrap() {
               <h2>{selected.symbol} lifecycle</h2>
               <p className="muted compact">Underlying {shortAddress(selected.underlying)}. Wrapper {shortAddress(selected.wrapper)}.</p>
             </div>
-            <span className="registry-count">{lifecycleSummary.completed}/{lifecycleSummary.total} verified</span>
+            <span className="registry-count">{lifecycleSummary.completed}/{lifecycleSummary.total} steps done</span>
           </div>
           <div className={`pair-state ${selectedSafety.tone}`}>
             <strong>{selectedSafety.badge}</strong>
@@ -304,6 +305,14 @@ export function CipherWrap() {
           </div>
           <label>Amount<input value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
           {wrapPlan && <p className="muted compact">Wrap plan: {formatRawAmount(wrapPlan.roundedRaw, 6)} public units become {wrapPlan.confidentialUnits.toString()} raw confidential units.</p>}
+          <div className="button-row action-row">
+            <button className="button secondary" onClick={mintUnderlying} disabled={!wallet || !selectedSafety.canMint}>Mint mock</button>
+            <button className="button secondary" onClick={approveUnderlying} disabled={!wallet || !selectedSafety.canWrite}>Approve spend</button>
+            <button className="button primary" onClick={wrapApproved} disabled={!wallet || !selectedSafety.canWrite}>Wrap approved</button>
+            <button className="button secondary" onClick={() => decryptBalance()} disabled={!wallet}>User-decrypt balance</button>
+            <button className="button secondary" onClick={prepareUnwrap} disabled={!wallet || !selectedSafety.canWrite}>Request unwrap</button>
+          </div>
+          <p className="status-line">{lifecycle.banner}</p>
           <div className="lifecycle-grid">
             {LIFECYCLE_STEPS.map((step) => {
               const state = lifecycle.steps[step.key];
@@ -316,14 +325,6 @@ export function CipherWrap() {
               );
             })}
           </div>
-          <div className="button-row action-row">
-            <button className="button secondary" onClick={mintUnderlying} disabled={!wallet || !selectedSafety.canMint}>Mint mock</button>
-            <button className="button secondary" onClick={approveUnderlying} disabled={!wallet || !selectedSafety.canWrite}>Approve spend</button>
-            <button className="button primary" onClick={wrapApproved} disabled={!wallet || !selectedSafety.canWrite}>Wrap approved</button>
-            <button className="button secondary" onClick={() => decryptBalance()} disabled={!wallet}>User-decrypt balance</button>
-            <button className="button secondary" onClick={prepareUnwrap} disabled={!wallet || !selectedSafety.canWrite}>Request unwrap</button>
-          </div>
-          <p className="status-line">{lifecycle.banner}</p>
           {unwrapRequest && <p className="notice">Unwrap request {shortAddress(unwrapRequest.unwrapRequestId)}. Amount handle {shortAddress(unwrapRequest.amountHandle)}.</p>}
           <div className="helper-panel">
             <h3>Unwrap finalization helper</h3>
