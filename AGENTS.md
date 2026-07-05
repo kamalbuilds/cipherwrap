@@ -28,3 +28,30 @@ Follow `~/.config/agent-rules/anti-ai-slop-frontend.md`. No rainbow gradient tex
 ## Verification before done
 
 Run tests and build before claiming completion. Do not defer verification to the user.
+
+## bh-multi screenshot budget rule
+
+Do not take a screenshot after every action.
+
+Use screenshots only for:
+
+1. initial page sanity check,
+2. visually ambiguous state,
+3. final verification per route,
+4. failure/debug evidence.
+
+For routine checks, prefer cheap DOM/CDP reads:
+
+- `page_info()`
+- `js("document.body.innerText")`
+- `js("...query selectors...")`
+- direct provider/Rabby calls via `window.ethereum.request`
+- transaction/status text extraction
+- `list_tabs()` for Rabby prompts
+
+Use DOM clicks when target text is known, not coordinate screenshots:
+
+```python
+js("""[...document.querySelectorAll('button')]
+  .find(b => b.innerText.includes('Connect Sepolia'))?.click()""")
+```
